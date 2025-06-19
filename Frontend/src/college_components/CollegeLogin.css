@@ -1,0 +1,13 @@
+/* Animation for the register college form */
+.register-form-anim {
+  max-height: 0;
+  opacity: 0;
+  transform: translateY(-20px);
+  transition: max-height 0.5s cubic-bezier(0.4,0,0.2,1), opacity 0.5s, transform 0.5s;
+}
+.register-form-anim.show {
+  max-height: 2000px;
+  opacity: 1;
+  transform: translateY(0);
+  transition: max-height 0.5s cubic-bezier(0.4,0,0.2,1), opacity 0.5s, transform 0.5s;
+} 
