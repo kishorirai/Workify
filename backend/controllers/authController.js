@@ -1,5 +1,19 @@
 const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
 const Student = require('../models/Student');
+
+// Helper to generate JWT
+function generateToken(student) {
+  return jwt.sign(
+    {
+      id: student._id,
+      name: student.name,
+      email: student.email
+    },
+    process.env.JWT_SECRET,
+    { expiresIn: '1d' }
+  );
+}
 
 // Student signup
 exports.signup = async (req, res) => {
@@ -18,20 +32,16 @@ exports.signup = async (req, res) => {
     const student = new Student({ name, email, password: hashedPassword });
     await student.save();
 
-    // Set session data - this will persist to MongoStore
-    req.session.user = {
-      id: student._id.toString(),
-      name: student.name,
-      email: student.email
-    };
+    // Generate JWT token
+    const token = generateToken(student);
 
-    // Make sure the session is saved before sending response
-    req.session.save((err) => {
-      if (err) return res.status(500).json({ message: "Session save failed" });
-      res.status(201).json({
-        studentId: student._id,
-        student: req.session.user
-      });
+    res.status(201).json({
+      token,
+      student: {
+        id: student._id,
+        name: student.name,
+        email: student.email
+      }
     });
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -48,31 +58,50 @@ exports.login = async (req, res) => {
     const isMatch = await bcrypt.compare(password, student.password);
     if (!isMatch) return res.status(400).json({ message: "Invalid credentials" });
 
-    // Set session data
-    req.session.user = {
-      id: student._id.toString(),
-      name: student.name,
-      email: student.email
-    };
+    const token = generateToken(student);
 
-    // Make sure the session is saved before sending response
-    req.session.save((err) => {
-      if (err) return res.status(500).json({ message: "Session save failed" });
-      res.json({
-        studentId: student._id,
-        student: req.session.user
-      });
+    res.json({
+      token,
+      student: {
+        id: student._id,
+        name: student.name,
+        email: student.email
+      }
     });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
 };
 
-// Student logout
-exports.logout = (req, res) => {
-  req.session.destroy((err) => {
-    if (err) return res.status(500).json({ message: "Logout failed" });
-    res.clearCookie('connect.sid'); 
-    res.json({ message: 'Logged out successfully' });
-  });
+// Middleware to protect routes
+exports.protect = (req, res, next) => {
+  const authHeader = req.headers.authorization;
+  let token;
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    token = authHeader.split(' ')[1];
+  }
+  if (!token) {
+    return res.status(401).json({ message: "No token, authorization denied" });
+  }
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    req.user = decoded; // Attach user info to request
+    next();
+  } catch (err) {
+    return res.status(401).json({ message: "Token is not valid" });
+  }
+};
+
+// Get profile (protected)
+exports.getProfile = async (req, res) => {
+  try {
+    // req.user is set by protect middleware
+    const student = await Student.findById(req.user.id).select('-password');
+    if (!student) {
+      return res.status(404).json({ message: "Student not found" });
+    }
+    res.json({ profile: student });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
 };
