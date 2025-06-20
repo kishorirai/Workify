@@ -4,21 +4,10 @@ const studentController = require('../controllers/studentController');
 const authMiddleware = require('../middleware/authMiddleware');
 const { imageUpload } = require('../middleware/uploadMiddleware');
 
-// Get student profile
-router.get('/:studentId', authMiddleware, studentController.getStudentProfile);
-
-// Update student profile
-router.put('/:studentId', authMiddleware, studentController.updateStudentProfile);
-
-// Upload profile picture (memory upload)
-router.post(
-  '/:studentId/profile-pic',
-  authMiddleware,
-  imageUpload.single('profilePic'),
-  studentController.uploadProfilePic
-);
-
-// Get profile picture
-router.get('/:studentId/profile-pic', authMiddleware, studentController.getProfilePic);
+// Profile routes using /me (token-based auth)
+router.get('/me', authMiddleware, studentController.getOwnProfile);
+router.put('/me', authMiddleware, studentController.updateOwnProfile);
+router.post('/me/profile-pic', authMiddleware, imageUpload.single('profilePic'), studentController.uploadProfilePic);
+router.get('/me/profile-pic', authMiddleware, studentController.getProfilePic);
 
 module.exports = router;
